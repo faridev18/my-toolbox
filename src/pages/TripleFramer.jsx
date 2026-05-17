@@ -11,20 +11,11 @@ const COLORS = [
 ];
 
 const CANVAS_W = 1800;
-const CANVAS_H = 900;
-const PHONE_RADIUS = 36;
-const PHONE_ASPECT = 9 / 19.5; // largeur/hauteur ratio téléphone
+const CANVAS_H = 1300;
+const PHONE_ASPECT = 9 / 19.5;
 
-function drawPhoneFrame(ctx, x, y, w, h, img) {
-  const r = PHONE_RADIUS;
-
-  // Ombre portée
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.35)';
-  ctx.shadowBlur = 40;
-  ctx.shadowOffsetY = 18;
-
-  // Fond blanc du téléphone (bezel)
+// Utilitaire : rectangle à coins arrondis
+function rrect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + w - r, y);
@@ -36,88 +27,175 @@ function drawPhoneFrame(ctx, x, y, w, h, img) {
   ctx.lineTo(x, y + r);
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
-  ctx.fillStyle = '#1a1a1a';
+}
+
+function drawPhoneFrame(ctx, x, y, w, h, img) {
+  const r = w * 0.11; // rayon proportionnel à la largeur
+
+  // Bords du biseau (bezel fins comme un iPhone moderne)
+  const sideBezel = w * 0.028;
+  const topBezel  = h * 0.038;
+  const botBezel  = h * 0.05;
+  const screenX = x + sideBezel;
+  const screenY = y + topBezel;
+  const screenW = w - sideBezel * 2;
+  const screenH = h - topBezel - botBezel;
+  const screenR = r * 0.82;
+
+  // ── Ombre multicouche ───────────────────────────────────────
+  ctx.save();
+  // Ombre diffuse large
+  ctx.shadowColor = 'rgba(0,0,0,0.28)';
+  ctx.shadowBlur = w * 0.18;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = h * 0.04;
+  rrect(ctx, x, y, w, h, r);
+  ctx.fillStyle = '#111';
   ctx.fill();
   ctx.restore();
 
-  // Bordure intérieure (écran)
-  const bezel = w * 0.05;
-  const screenX = x + bezel;
-  const screenY = y + bezel;
-  const screenW = w - bezel * 2;
-  const screenH = h - bezel * 2;
-  const screenR = r * 0.75;
-
+  // Ombre proche plus nette
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(screenX + screenR, screenY);
-  ctx.lineTo(screenX + screenW - screenR, screenY);
-  ctx.arcTo(screenX + screenW, screenY, screenX + screenW, screenY + screenR, screenR);
-  ctx.lineTo(screenX + screenW, screenY + screenH - screenR);
-  ctx.arcTo(screenX + screenW, screenY + screenH, screenX + screenW - screenR, screenY + screenH, screenR);
-  ctx.lineTo(screenX + screenR, screenY + screenH);
-  ctx.arcTo(screenX, screenY + screenH, screenX, screenY + screenH - screenR, screenR);
-  ctx.lineTo(screenX, screenY + screenR);
-  ctx.arcTo(screenX, screenY, screenX + screenR, screenY, screenR);
-  ctx.closePath();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = w * 0.05;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = h * 0.015;
+  rrect(ctx, x, y, w, h, r);
+  ctx.fillStyle = '#111';
+  ctx.fill();
+  ctx.restore();
 
+  // ── Corps du téléphone (dégradé métallique sombre) ──────────
+  ctx.save();
+  rrect(ctx, x, y, w, h, r);
+  const bodyGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+  bodyGrad.addColorStop(0,    '#3a3a3c');
+  bodyGrad.addColorStop(0.35, '#1c1c1e');
+  bodyGrad.addColorStop(0.7,  '#141416');
+  bodyGrad.addColorStop(1,    '#0d0d0f');
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // ── Liseret métallique (rim) ─────────────────────────────────
+  ctx.save();
+  rrect(ctx, x, y, w, h, r);
+  ctx.strokeStyle = '#5a5a5e';
+  ctx.lineWidth = w * 0.012;
+  ctx.stroke();
+  // Reflet haut du rim
+  rrect(ctx, x, y, w, h, r);
+  const rimGrad = ctx.createLinearGradient(x, y, x, y + h * 0.15);
+  rimGrad.addColorStop(0,   'rgba(255,255,255,0.18)');
+  rimGrad.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.strokeStyle = rimGrad;
+  ctx.lineWidth = w * 0.008;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Boutons latéraux gauche (volume ×2 + silencieux) ─────────
+  const btnW  = w * 0.028;
+  const btnR  = btnW / 2;
+  const silH  = h * 0.055;
+  const volH  = h * 0.08;
+  const silY  = y + h * 0.16;
+  const vol1Y = y + h * 0.26;
+  const vol2Y = y + h * 0.36;
+  for (const [by, bh] of [[silY, silH], [vol1Y, volH], [vol2Y, volH]]) {
+    ctx.save();
+    rrect(ctx, x - btnW * 0.6, by, btnW, bh, btnR);
+    const btnGrad = ctx.createLinearGradient(x - btnW, by, x, by);
+    btnGrad.addColorStop(0, '#2a2a2c');
+    btnGrad.addColorStop(1, '#4a4a4e');
+    ctx.fillStyle = btnGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#5a5a60';
+    ctx.lineWidth = w * 0.005;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Bouton power droit ───────────────────────────────────────
+  const pwrH = h * 0.12;
+  const pwrY = y + h * 0.24;
+  ctx.save();
+  rrect(ctx, x + w - btnW * 0.4, pwrY, btnW, pwrH, btnR);
+  const pwrGrad = ctx.createLinearGradient(x + w, pwrY, x + w + btnW, pwrY);
+  pwrGrad.addColorStop(0, '#4a4a4e');
+  pwrGrad.addColorStop(1, '#2a2a2c');
+  ctx.fillStyle = pwrGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#5a5a60';
+  ctx.lineWidth = w * 0.005;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Écran ────────────────────────────────────────────────────
+  ctx.save();
+  rrect(ctx, screenX, screenY, screenW, screenH, screenR);
   if (img) {
     ctx.clip();
-    // Adapter l'image en cover
     const scaleX = screenW / img.width;
     const scaleY = screenH / img.height;
-    const scale = Math.max(scaleX, scaleY);
-    const dw = img.width * scale;
+    const scale  = Math.max(scaleX, scaleY);
+    const dw = img.width  * scale;
     const dh = img.height * scale;
-    const dx = screenX + (screenW - dw) / 2;
-    const dy = screenY + (screenH - dh) / 2;
-    ctx.drawImage(img, dx, dy, dw, dh);
+    ctx.drawImage(img,
+      screenX + (screenW - dw) / 2,
+      screenY + (screenH - dh) / 2,
+      dw, dh
+    );
   } else {
-    ctx.fillStyle = '#374151';
-    ctx.fill();
-    // Icône placeholder
-    ctx.restore();
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(screenX + screenR, screenY);
-    ctx.lineTo(screenX + screenW - screenR, screenY);
-    ctx.arcTo(screenX + screenW, screenY, screenX + screenW, screenY + screenR, screenR);
-    ctx.lineTo(screenX + screenW, screenY + screenH - screenR);
-    ctx.arcTo(screenX + screenW, screenY + screenH, screenX + screenW - screenR, screenY + screenH, screenR);
-    ctx.lineTo(screenX + screenR, screenY + screenH);
-    ctx.arcTo(screenX, screenY + screenH, screenX, screenY + screenH - screenR, screenR);
-    ctx.lineTo(screenX, screenY + screenR);
-    ctx.arcTo(screenX, screenY, screenX + screenR, screenY, screenR);
-    ctx.closePath();
     ctx.clip();
-    ctx.fillStyle = '#1f2937';
+    // Fond écran dégradé sombre
+    const scGrad = ctx.createLinearGradient(screenX, screenY, screenX, screenY + screenH);
+    scGrad.addColorStop(0,   '#1a1a2e');
+    scGrad.addColorStop(1,   '#0f0f1a');
+    ctx.fillStyle = scGrad;
     ctx.fill();
-    // Texte placeholder
-    ctx.fillStyle = '#6b7280';
-    ctx.font = `bold ${Math.round(screenW * 0.1)}px sans-serif`;
+    // Icône + centrée
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.font = `bold ${Math.round(screenW * 0.18)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('+', screenX + screenW / 2, screenY + screenH / 2);
   }
   ctx.restore();
 
-  // Notch
-  const notchW = w * 0.28;
-  const notchH = bezel * 0.9;
-  const notchX = x + (w - notchW) / 2;
-  const notchY = y + bezel * 0.1;
-  const notchR = notchH / 2;
+  // ── Reflet vitre (overlay dégradé diagonal) ──────────────────
   ctx.save();
-  ctx.fillStyle = '#1a1a1a';
-  ctx.beginPath();
-  ctx.moveTo(notchX + notchR, notchY);
-  ctx.lineTo(notchX + notchW - notchR, notchY);
-  ctx.arcTo(notchX + notchW, notchY, notchX + notchW, notchY + notchR, notchR);
-  ctx.arcTo(notchX + notchW, notchY + notchH, notchX + notchW - notchR, notchY + notchH, notchR);
-  ctx.lineTo(notchX + notchR, notchY + notchH);
-  ctx.arcTo(notchX, notchY + notchH, notchX, notchY + notchR, notchR);
-  ctx.arcTo(notchX, notchY, notchX + notchR, notchY, notchR);
-  ctx.closePath();
+  rrect(ctx, screenX, screenY, screenW, screenH, screenR);
+  ctx.clip();
+  const glassGrad = ctx.createLinearGradient(
+    screenX, screenY,
+    screenX + screenW * 0.6, screenY + screenH * 0.45
+  );
+  glassGrad.addColorStop(0,    'rgba(255,255,255,0.10)');
+  glassGrad.addColorStop(0.4,  'rgba(255,255,255,0.03)');
+  glassGrad.addColorStop(1,    'rgba(255,255,255,0)');
+  ctx.fillStyle = glassGrad;
+  ctx.fillRect(screenX, screenY, screenW, screenH);
+  ctx.restore();
+
+  // ── Dynamic Island (pill) ────────────────────────────────────
+  const diW = w * 0.30;
+  const diH = h * 0.022;
+  const diX = x + (w - diW) / 2;
+  const diY = y + topBezel * 0.28;
+  ctx.save();
+  rrect(ctx, diX, diY, diW, diH, diH / 2);
+  ctx.fillStyle = '#000';
+  ctx.fill();
+  ctx.restore();
+
+  // ── Barre home indicator ─────────────────────────────────────
+  const barW = w * 0.32;
+  const barH = h * 0.005;
+  const barX = x + (w - barW) / 2;
+  const barY = y + h - botBezel * 0.42;
+  ctx.save();
+  rrect(ctx, barX, barY, barW, barH, barH / 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
   ctx.fill();
   ctx.restore();
 }
@@ -172,12 +250,19 @@ function TripleFramer() {
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Calcul dimensions des téléphones
+    // Calcul dimensions des téléphones (contraindre par hauteur ET largeur)
     const totalPadding = padding * 2;
     const gapBetween = padding * 0.8;
+    const availableH = CANVAS_H - totalPadding;
     const availableW = CANVAS_W - totalPadding - gapBetween * 2;
-    const phoneW = availableW / 3;
-    const phoneH = phoneW / PHONE_ASPECT;
+    // Taille depuis la hauteur
+    let phoneH = availableH;
+    let phoneW = phoneH * PHONE_ASPECT;
+    // Si trop large, contraindre par la largeur
+    if (phoneW * 3 > availableW) {
+      phoneW = availableW / 3;
+      phoneH = phoneW / PHONE_ASPECT;
+    }
 
     const startY = (CANVAS_H - phoneH) / 2;
     const startX = (CANVAS_W - (phoneW * 3 + gapBetween * 2)) / 2;
@@ -220,53 +305,52 @@ function TripleFramer() {
         <div className="grid lg:grid-cols-3 gap-8">
 
           {/* Colonne gauche : slots upload */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h2 className="text-lg font-semibold text-gray-700">Captures d'écran</h2>
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-xl shadow-md p-4"
-              >
-                <p className="text-sm font-medium text-gray-600 mb-3">Téléphone {i + 1}</p>
-                <div
-                  className="relative border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 transition-colors overflow-hidden"
-                  style={{ aspectRatio: '9/19.5' }}
-                  onClick={() => fileInputRefs[i].current?.click()}
-                  onDrop={(e) => handleDrop(e, i)}
-                  onDragOver={handleDragOver}
-                >
-                  {images[i] ? (
-                    <img
-                      src={images[i].src}
-                      alt={`Capture ${i + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 gap-2">
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                      </svg>
-                      <span className="text-xs text-center px-2">Cliquer ou déposer une image</span>
-                    </div>
+            <div className="flex gap-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                  <p className="text-xs font-medium text-gray-500">#{i + 1}</p>
+                  <div
+                    className="relative w-full border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-indigo-400 transition-colors overflow-hidden bg-white shadow-sm"
+                    style={{ aspectRatio: '9/19.5' }}
+                    onClick={() => fileInputRefs[i].current?.click()}
+                    onDrop={(e) => handleDrop(e, i)}
+                    onDragOver={handleDragOver}
+                  >
+                    {images[i] ? (
+                      <img
+                        src={images[i].src}
+                        alt={`Capture ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-300 gap-1">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span className="text-xs text-center px-1 leading-tight">Ajouter</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRefs[i]}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileChange(e, i)}
+                  />
+                  {images[i] && (
+                    <button
+                      className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                      onClick={() => setImages((prev) => { const n = [...prev]; n[i] = null; return n; })}
+                    >
+                      Supprimer
+                    </button>
                   )}
                 </div>
-                <input
-                  ref={fileInputRefs[i]}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => handleFileChange(e, i)}
-                />
-                {images[i] && (
-                  <button
-                    className="mt-2 text-xs text-red-400 hover:text-red-600 transition-colors"
-                    onClick={() => setImages((prev) => { const n = [...prev]; n[i] = null; return n; })}
-                  >
-                    Supprimer
-                  </button>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           {/* Colonne centrale + droite : aperçu */}

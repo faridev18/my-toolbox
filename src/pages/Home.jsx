@@ -67,7 +67,7 @@ function Home() {
         </div>
       </div>
 
-      {/* Footer */
+      {/* Footer */}
       <footer className="py-6 text-center">
         <p className="text-gray-600 flex items-center justify-center gap-2">
           Made with <span className="text-red-500">❤️</span> by{' '}
